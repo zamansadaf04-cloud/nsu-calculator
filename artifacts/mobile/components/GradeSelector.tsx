@@ -1,7 +1,5 @@
 import React, { useState } from "react";
 import {
-  Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,7 +9,6 @@ import {
 import { Feather } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
 import { GRADE_SCALE } from "@/constants/nsuData";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 interface GradeSelectorProps {
   value: string;
@@ -20,8 +17,7 @@ interface GradeSelectorProps {
 
 export function GradeSelector({ value, onChange }: GradeSelectorProps) {
   const colors = useColors();
-  const insets = useSafeAreaInsets();
-  const [visible, setVisible] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
   const selected = GRADE_SCALE.find((g) => g.grade === value);
   const gradeColor =
@@ -32,14 +28,14 @@ export function GradeSelector({ value, onChange }: GradeSelectorProps) {
       : colors.destructive;
 
   return (
-    <>
+    <View>
       <Pressable
-        onPress={() => setVisible(true)}
+        onPress={() => setExpanded((v) => !v)}
         style={({ pressed }) => [
           styles.selector,
           {
-            backgroundColor: colors.card,
-            borderColor: colors.border,
+            backgroundColor: colors.background,
+            borderColor: expanded ? colors.primary : colors.border,
             opacity: pressed ? 0.7 : 1,
             borderRadius: 10,
           },
@@ -48,86 +44,90 @@ export function GradeSelector({ value, onChange }: GradeSelectorProps) {
         <Text
           style={[
             styles.gradeText,
-            { color: value ? gradeColor : colors.mutedForeground, fontFamily: "Inter_600SemiBold" },
+            {
+              color: value ? gradeColor : colors.mutedForeground,
+              fontFamily: "Inter_600SemiBold",
+            },
           ]}
         >
-          {value || "Select Grade"}
+          {value ? `${value}  (${selected?.points.toFixed(2)})` : "Select Grade"}
         </Text>
-        <Feather name="chevron-down" size={16} color={colors.mutedForeground} />
+        <Feather
+          name={expanded ? "chevron-up" : "chevron-down"}
+          size={16}
+          color={colors.mutedForeground}
+        />
       </Pressable>
 
-      <Modal visible={visible} transparent animationType="fade">
-        <Pressable style={styles.overlay} onPress={() => setVisible(false)}>
-          <View
-            style={[
-              styles.sheet,
-              {
-                backgroundColor: colors.card,
-                paddingBottom: insets.bottom + 16,
-                borderColor: colors.border,
-              },
-            ]}
-          >
-            <Text style={[styles.sheetTitle, { color: colors.foreground, fontFamily: "Inter_700Bold" }]}>
-              Select Grade
-            </Text>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {GRADE_SCALE.map((item) => {
-                const isSelected = item.grade === value;
-                const itemColor =
-                  item.points >= 3.0
-                    ? colors.success
-                    : item.points >= 2.0
-                    ? colors.warning
-                    : colors.destructive;
-                return (
-                  <Pressable
-                    key={item.grade}
-                    onPress={() => {
-                      onChange(item.grade, item.points);
-                      setVisible(false);
-                    }}
-                    style={({ pressed }) => [
-                      styles.gradeItem,
+      {expanded && (
+        <View
+          style={[
+            styles.dropdown,
+            {
+              backgroundColor: colors.card,
+              borderColor: colors.primary,
+              borderRadius: 10,
+            },
+          ]}
+        >
+          <View style={styles.grid}>
+            {GRADE_SCALE.map((item) => {
+              const isSelected = item.grade === value;
+              const itemColor =
+                item.points >= 3.0
+                  ? colors.success
+                  : item.points >= 2.0
+                  ? colors.warning
+                  : colors.destructive;
+              return (
+                <Pressable
+                  key={item.grade}
+                  onPress={() => {
+                    onChange(item.grade, item.points);
+                    setExpanded(false);
+                  }}
+                  style={({ pressed }) => [
+                    styles.gradeChip,
+                    {
+                      backgroundColor: isSelected
+                        ? itemColor
+                        : pressed
+                        ? colors.muted
+                        : colors.background,
+                      borderColor: isSelected ? itemColor : colors.border,
+                      borderRadius: 8,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.chipGrade,
                       {
-                        backgroundColor: isSelected
-                          ? colors.secondary
-                          : pressed
-                          ? colors.muted
-                          : "transparent",
-                        borderRadius: 10,
+                        color: isSelected ? "#fff" : itemColor,
+                        fontFamily: "Inter_700Bold",
                       },
                     ]}
                   >
-                    <View style={[styles.gradeBadge, { backgroundColor: itemColor + "20" }]}>
-                      <Text
-                        style={[styles.gradeItemGrade, { color: itemColor, fontFamily: "Inter_700Bold" }]}
-                      >
-                        {item.grade}
-                      </Text>
-                    </View>
-                    <Text
-                      style={[
-                        styles.gradeItemPoints,
-                        {
-                          color: isSelected ? colors.primary : colors.foreground,
-                          fontFamily: "Inter_500Medium",
-                        },
-                      ]}
-                    >
-                      {item.points.toFixed(2)} Points
-                    </Text>
-                    {isSelected && (
-                      <Feather name="check" size={18} color={colors.primary} style={styles.checkIcon} />
-                    )}
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
+                    {item.grade}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.chipPoints,
+                      {
+                        color: isSelected ? "rgba(255,255,255,0.85)" : colors.mutedForeground,
+                        fontFamily: "Inter_400Regular",
+                      },
+                    ]}
+                  >
+                    {item.points.toFixed(1)}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
-        </Pressable>
-      </Modal>
-    </>
+        </View>
+      )}
+    </View>
   );
 }
 
@@ -139,53 +139,32 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
     borderWidth: 1,
-    minWidth: 120,
   },
   gradeText: {
     fontSize: 15,
     marginRight: 8,
   },
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "flex-end",
+  dropdown: {
+    marginTop: 4,
+    borderWidth: 1.5,
+    padding: 10,
   },
-  sheet: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingTop: 20,
-    paddingHorizontal: 16,
-    maxHeight: 480,
-    borderTopWidth: 1,
-  },
-  sheetTitle: {
-    fontSize: 18,
-    marginBottom: 12,
-    textAlign: "center",
-  },
-  gradeItem: {
+  grid: {
     flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  gradeChip: {
+    width: "17%",
+    paddingVertical: 8,
     alignItems: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    marginBottom: 4,
+    borderWidth: 1,
+    gap: 2,
   },
-  gradeBadge: {
-    width: 44,
-    height: 36,
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 14,
+  chipGrade: {
+    fontSize: 13,
   },
-  gradeItemGrade: {
-    fontSize: 14,
-  },
-  gradeItemPoints: {
-    fontSize: 15,
-    flex: 1,
-  },
-  checkIcon: {
-    marginLeft: 8,
+  chipPoints: {
+    fontSize: 10,
   },
 });
