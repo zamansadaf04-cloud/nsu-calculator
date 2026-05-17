@@ -1,0 +1,104 @@
+Build a modern CGPA Calculator web app for North South University (NSU) students.
+
+App idea:
+A clean, modern, mobile-friendly CGPA counter where students can calculate current CGPA, semester GPA, retake impact, and CGPA goal requirements.
+
+Main features:
+
+1. Course Database
+- Add NSU course list with course code, title, and credit.
+- Example:
+  CSE115 - Programming Language I - 3 credits
+  CSE115L - Programming Language I Lab - 1 credit
+  CSE173 - Discrete Mathematics - 3 credits
+  CSE215 - Programming Language II - 3 credits
+  CSE215L - Programming Language II Lab - 1 credit
+  MAT116 - Pre-Calculus - 3 credits
+  MAT120 - Calculus I - 3 credits
+  MAT125 - Linear Algebra - 3 credits
+  ENG102 - Composition I - 3 credits
+  ENG103 - Composition II - 3 credits
+  EEE154 - Introduction to Electrical Engineering Lab - 1 credit
+  SOC101 - Introduction to Sociology - 3 credits
+  HIS101 - History of Bengal - 3 credits
+- Allow admin/user to add more courses manually.
+
+2. Grade System
+Use NSU grading scale:
+A = 4.00
+A- = 3.70
+B+ = 3.30
+B = 3.00
+B- = 2.70
+C+ = 2.30
+C = 2.00
+C- = 1.70
+D+ = 1.30
+D = 1.00
+F = 0.00
+
+3. CGPA Calculator
+- User enters completed courses, credits, and grades.
+- Automatically calculate:
+  Total credits completed
+  Total grade points
+  CGPA
+- Formula:
+  CGPA = total grade points / total credits
+
+4. Semester GPA Calculator
+- User can create semesters.
+- Each semester can contain multiple courses.
+- Show semester GPA separately.
+- Show overall CGPA after each semester.
+
+5. CGPA Goal Calculator
+- User enters current CGPA and completed credits.
+- User enters target CGPA and remaining credits.
+- App shows required average GPA needed in future courses.
+- Show message if target is impossible.
+
+6. Retake Calculator
+- User selects an old course grade and new expected grade.
+- App replaces old grade points with new grade points.
+- Show new CGPA after retake.
+- Important: retake should replace old grade, not add duplicate credit.
+
+7. UI/UX
+- Modern dashboard design.
+- Use cards, charts, progress bars, and clean tables.
+- Mobile responsive.
+- Add dark mode and light mode.
+- Use attractive colors like blue, purple, white, and soft gradients.
+- Add “CG Goal Progress” bar.
+- Add motivational messages like:
+  “You need an average A- to reach your goal.”
+  “Your CGPA improved by 0.15 after retake.”
+
+8. Data Storage
+- Save user data locally using localStorage.
+- User should not lose data after refreshing.
+- Add export/import data option as JSON.
+
+9. Pages/Sections
+- Dashboard
+- Add Courses
+- Semester Calculator
+- CGPA Goal
+- Retake Planner
+- Course Database
+- Settings
+
+10. Extra Features
+- Search course by code or title.
+- Filter courses by department.
+- Allow custom course credit.
+- Allow custom grade.
+- Reset all data button with confirmation.
+- Show CGPA with 2 decimal places.
+
+Tech:
+Use React + Tailwind CSS.
+Make the design premium, modern, and student-friendly.
+Write clean code with reusable components.
+Make everything functional, not just UI demo.
