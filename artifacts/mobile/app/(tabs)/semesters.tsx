@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import {
-  Alert,
   Modal,
   Platform,
   Pressable,
@@ -48,6 +47,8 @@ export default function SemestersScreen() {
   const [customCredits, setCustomCredits] = useState("3");
   const [grade, setGrade] = useState("");
   const [gradePoints, setGradePoints] = useState(0);
+  const [formError, setFormError] = useState("");
+  const [semError, setSemError] = useState("");
 
   const selectedSem = data.semesters.find((s) => s.id === selectedSemId);
   const overallCGPA = (() => {
@@ -59,11 +60,12 @@ export default function SemestersScreen() {
   })();
 
   function handleAddSemester() {
+    setSemError("");
     const existing = data.semesters.find(
       (s) => s.season === semSeason && s.year === semYear
     );
     if (existing) {
-      Alert.alert("Already Exists", `${semSeason} ${semYear} semester already exists.`);
+      setSemError(`${semSeason} ${semYear} semester already exists.`);
       return;
     }
     const sem: Semester = {
@@ -77,18 +79,24 @@ export default function SemestersScreen() {
     };
     addSemester(sem);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setSemError("");
     setAddSemModal(false);
   }
 
   function handleAddCourse() {
-    if (!selectedSemId || !grade) {
-      Alert.alert("Missing Info", "Please select a grade.");
+    setFormError("");
+    if (!grade) {
+      setFormError("Please select a grade.");
       return;
     }
     let course: SemesterCourse;
     if (useCustom) {
-      if (!customCode.trim() || !customTitle.trim()) {
-        Alert.alert("Missing Info", "Please enter course code and title.");
+      if (!customCode.trim()) {
+        setFormError("Please enter a course code.");
+        return;
+      }
+      if (!customTitle.trim()) {
+        setFormError("Please enter a course title.");
         return;
       }
       const credits = parseFloat(customCredits) || 3;
@@ -103,7 +111,7 @@ export default function SemestersScreen() {
       };
     } else {
       if (!selectedCourseId) {
-        Alert.alert("Missing Course", "Please select a course.");
+        setFormError("Please select a course from the list.");
         return;
       }
       const c = allCourses.find((c) => c.id === selectedCourseId);
@@ -118,7 +126,7 @@ export default function SemestersScreen() {
         gradePoints,
       };
     }
-    addCourseToSemester(selectedSemId, course);
+    addCourseToSemester(selectedSemId!, course);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     resetAddCourse();
   }
@@ -389,6 +397,14 @@ export default function SemestersScreen() {
                 </Pressable>
               ))}
             </ScrollView>
+            {semError !== "" && (
+              <View style={[styles.errorBox, { backgroundColor: colors.destructive + "15", borderColor: colors.destructive, borderRadius: 8 }]}>
+                <Feather name="alert-circle" size={14} color={colors.destructive} />
+                <Text style={[styles.errorText, { color: colors.destructive, fontFamily: "Inter_500Medium" }]}>
+                  {semError}
+                </Text>
+              </View>
+            )}
             <Pressable
               onPress={handleAddSemester}
               style={[styles.confirmFullBtn, { backgroundColor: colors.primary, borderRadius: 12 }]}
@@ -513,6 +529,14 @@ export default function SemestersScreen() {
               </ScrollView>
             )}
 
+            {formError !== "" && (
+              <View style={[styles.errorBox, { backgroundColor: colors.destructive + "15", borderColor: colors.destructive, borderRadius: 8 }]}>
+                <Feather name="alert-circle" size={14} color={colors.destructive} />
+                <Text style={[styles.errorText, { color: colors.destructive, fontFamily: "Inter_500Medium" }]}>
+                  {formError}
+                </Text>
+              </View>
+            )}
             <View style={styles.modalActions}>
               <Pressable
                 onPress={resetAddCourse}
@@ -591,6 +615,8 @@ const styles = StyleSheet.create({
   seasonBtn: { flex: 1, paddingVertical: 10, alignItems: "center" },
   yearBtn: { paddingVertical: 10, paddingHorizontal: 16 },
   confirmFullBtn: { paddingVertical: 14, alignItems: "center" },
+  errorBox: { flexDirection: "row", alignItems: "center", gap: 8, padding: 10, marginTop: 8, borderWidth: 1 },
+  errorText: { fontSize: 13, flex: 1 },
   toggleRow: { flexDirection: "row", padding: 3, marginBottom: 12 },
   toggleBtn: { flex: 1, paddingVertical: 8, alignItems: "center" },
   textInput: { borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, marginBottom: 8 },

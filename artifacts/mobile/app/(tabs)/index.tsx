@@ -1,7 +1,5 @@
 import React, { useState } from "react";
 import {
-  Alert,
-  FlatList,
   Modal,
   Platform,
   Pressable,
@@ -22,7 +20,7 @@ import { GoalProgressBar } from "@/components/GoalProgressBar";
 import { GradeSelector } from "@/components/GradeSelector";
 import { EmptyState } from "@/components/EmptyState";
 import { CompletedCourse } from "@/types";
-import { getGradeColor, NSU_COURSES } from "@/constants/nsuData";
+import { getGradeColor } from "@/constants/nsuData";
 
 function genId() {
   return Date.now().toString() + Math.random().toString(36).substr(2, 9);
@@ -33,6 +31,7 @@ export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
   const { data, cgpa, totalCredits, totalGradePoints, allCourses, addCompletedCourse, removeCompletedCourse } =
     useData();
+
   const [addModalVisible, setAddModalVisible] = useState(false);
   const [selectedCourseId, setSelectedCourseId] = useState("");
   const [customCode, setCustomCode] = useState("");
@@ -42,23 +41,11 @@ export default function DashboardScreen() {
   const [gradePoints, setGradePoints] = useState(0);
   const [useCustom, setUseCustom] = useState(false);
   const [courseSearch, setCourseSearch] = useState("");
+  const [formError, setFormError] = useState("");
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const completedCount = data.completedCourses.length;
-  const topSemester = data.semesters.reduce(
-    (best, s) => (s.gpa > best ? s.gpa : best),
-    0
-  );
-
-  const requiredAvg =
-    data.data?.targetCredits && data.data?.targetCGPA
-      ? null
-      : (() => {
-          const remaining = (data.targetCredits ?? 130) - totalCredits;
-          if (remaining <= 0) return null;
-          const needed =
-            ((data.targetCGPA ?? 3.5) * ((data.targetCredits ?? 130)) - totalGradePoints) / remaining;
-          return needed;
-        })();
+  const topSemester = data.semesters.reduce((best, s) => (s.gpa > best ? s.gpa : best), 0);
 
   function computeRequired() {
     const target = data.targetCGPA ?? 3.5;
@@ -68,17 +55,23 @@ export default function DashboardScreen() {
     const neededPoints = target * totalTarget - totalGradePoints;
     return neededPoints / remaining;
   }
-
   const reqAvg = computeRequired();
 
   function handleAddCourse() {
+    setFormError("");
+
     if (!grade) {
-      Alert.alert("Missing Grade", "Please select a grade.");
+      setFormError("Please select a grade before adding.");
       return;
     }
+
     if (useCustom) {
-      if (!customCode.trim() || !customTitle.trim()) {
-        Alert.alert("Missing Info", "Please enter course code and title.");
+      if (!customCode.trim()) {
+        setFormError("Please enter a course code.");
+        return;
+      }
+      if (!customTitle.trim()) {
+        setFormError("Please enter a course title.");
         return;
       }
       const credits = parseFloat(customCredits) || 3;
@@ -94,14 +87,14 @@ export default function DashboardScreen() {
       addCompletedCourse(c);
     } else {
       if (!selectedCourseId) {
-        Alert.alert("Missing Course", "Please select a course.");
+        setFormError("Please select a course from the list.");
         return;
       }
       const course = allCourses.find((c) => c.id === selectedCourseId);
       if (!course) return;
       const existing = data.completedCourses.find((c) => c.courseId === selectedCourseId);
       if (existing) {
-        Alert.alert("Already Added", `${course.code} is already in your completed courses.`);
+        setFormError(`${course.code} is already in your completed courses.`);
         return;
       }
       const c: CompletedCourse = {
@@ -115,6 +108,7 @@ export default function DashboardScreen() {
       };
       addCompletedCourse(c);
     }
+
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     resetModal();
   }
@@ -129,6 +123,7 @@ export default function DashboardScreen() {
     setGradePoints(0);
     setUseCustom(false);
     setCourseSearch("");
+    setFormError("");
   }
 
   const filteredCourses = allCourses.filter(
@@ -252,23 +247,21 @@ export default function DashboardScreen() {
         ) : (
           data.completedCourses.map((c) => {
             const gColor = getGradeColor(c.gradePoints);
+            const isConfirming = deleteConfirmId === c.id;
             return (
               <Pressable
                 key={c.id}
                 onLongPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                  Alert.alert("Remove Course", `Remove ${c.courseCode} from completed courses?`, [
-                    { text: "Cancel", style: "cancel" },
-                    {
-                      text: "Remove",
-                      style: "destructive",
-                      onPress: () => removeCompletedCourse(c.id),
-                    },
-                  ]);
+                  setDeleteConfirmId(c.id);
                 }}
                 style={[
                   styles.courseRow,
-                  { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius },
+                  {
+                    backgroundColor: isConfirming ? colors.destructive + "10" : colors.card,
+                    borderColor: isConfirming ? colors.destructive : colors.border,
+                    borderRadius: colors.radius,
+                  },
                 ]}
               >
                 <View style={[styles.gradePill, { backgroundColor: gColor + "20" }]}>
@@ -287,9 +280,29 @@ export default function DashboardScreen() {
                     {c.courseTitle}
                   </Text>
                 </View>
-                <Text style={[styles.creditText, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>
-                  {c.credits} cr
-                </Text>
+                {isConfirming ? (
+                  <View style={styles.deleteRow}>
+                    <Pressable
+                      onPress={() => setDeleteConfirmId(null)}
+                      style={[styles.deleteActionBtn, { backgroundColor: colors.muted, borderRadius: 8 }]}
+                    >
+                      <Feather name="x" size={14} color={colors.mutedForeground} />
+                    </Pressable>
+                    <Pressable
+                      onPress={() => {
+                        removeCompletedCourse(c.id);
+                        setDeleteConfirmId(null);
+                      }}
+                      style={[styles.deleteActionBtn, { backgroundColor: colors.destructive, borderRadius: 8 }]}
+                    >
+                      <Feather name="trash-2" size={14} color="#fff" />
+                    </Pressable>
+                  </View>
+                ) : (
+                  <Text style={[styles.creditText, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>
+                    {c.credits} cr
+                  </Text>
+                )}
               </Pressable>
             );
           })
@@ -314,12 +327,12 @@ export default function DashboardScreen() {
               Add Completed Course
             </Text>
 
-            {/* Toggle Custom / Select */}
+            {/* Toggle */}
             <View style={[styles.toggleRow, { backgroundColor: colors.muted, borderRadius: 10 }]}>
               {["Select Course", "Custom Course"].map((label, i) => (
                 <Pressable
                   key={label}
-                  onPress={() => setUseCustom(i === 1)}
+                  onPress={() => { setUseCustom(i === 1); setFormError(""); }}
                   style={[
                     styles.toggleBtn,
                     {
@@ -341,120 +354,104 @@ export default function DashboardScreen() {
               ))}
             </View>
 
-            {useCustom ? (
-              <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 300 }}>
-                <Text style={[styles.fieldLabel, { color: colors.mutedForeground, fontFamily: "Inter_500Medium" }]}>
-                  Course Code
-                </Text>
-                <TextInput
-                  value={customCode}
-                  onChangeText={setCustomCode}
-                  placeholder="e.g. CSE115"
-                  placeholderTextColor={colors.mutedForeground}
-                  style={[
-                    styles.textInput,
-                    {
-                      backgroundColor: colors.background,
-                      borderColor: colors.border,
-                      color: colors.foreground,
-                      fontFamily: "Inter_400Regular",
-                      borderRadius: 10,
-                    },
-                  ]}
-                  autoCapitalize="characters"
-                />
-                <Text style={[styles.fieldLabel, { color: colors.mutedForeground, fontFamily: "Inter_500Medium" }]}>
-                  Course Title
-                </Text>
-                <TextInput
-                  value={customTitle}
-                  onChangeText={setCustomTitle}
-                  placeholder="e.g. Programming Language I"
-                  placeholderTextColor={colors.mutedForeground}
-                  style={[
-                    styles.textInput,
-                    {
-                      backgroundColor: colors.background,
-                      borderColor: colors.border,
-                      color: colors.foreground,
-                      fontFamily: "Inter_400Regular",
-                      borderRadius: 10,
-                    },
-                  ]}
-                />
-                <Text style={[styles.fieldLabel, { color: colors.mutedForeground, fontFamily: "Inter_500Medium" }]}>
-                  Credits
-                </Text>
-                <TextInput
-                  value={customCredits}
-                  onChangeText={setCustomCredits}
-                  placeholder="3"
-                  placeholderTextColor={colors.mutedForeground}
-                  keyboardType="numeric"
-                  style={[
-                    styles.textInput,
-                    {
-                      backgroundColor: colors.background,
-                      borderColor: colors.border,
-                      color: colors.foreground,
-                      fontFamily: "Inter_400Regular",
-                      borderRadius: 10,
-                    },
-                  ]}
-                />
-                <Text style={[styles.fieldLabel, { color: colors.mutedForeground, fontFamily: "Inter_500Medium" }]}>
-                  Grade
-                </Text>
-                <GradeSelector value={grade} onChange={(g, p) => { setGrade(g); setGradePoints(p); }} />
-              </ScrollView>
-            ) : (
-              <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 340 }}>
-                <Text style={[styles.fieldLabel, { color: colors.mutedForeground, fontFamily: "Inter_500Medium" }]}>
-                  Search Course
-                </Text>
-                <View style={[styles.searchBox, { backgroundColor: colors.background, borderColor: colors.border, borderRadius: 10 }]}>
-                  <Feather name="search" size={16} color={colors.mutedForeground} />
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 340 }} keyboardShouldPersistTaps="handled">
+              {useCustom ? (
+                <View>
+                  <Text style={[styles.fieldLabel, { color: colors.mutedForeground, fontFamily: "Inter_500Medium" }]}>
+                    Course Code
+                  </Text>
                   <TextInput
-                    value={courseSearch}
-                    onChangeText={setCourseSearch}
-                    placeholder="Course code or title..."
+                    value={customCode}
+                    onChangeText={(t) => { setCustomCode(t); setFormError(""); }}
+                    placeholder="e.g. CSE115"
                     placeholderTextColor={colors.mutedForeground}
-                    style={[styles.searchInput, { color: colors.foreground, fontFamily: "Inter_400Regular" }]}
+                    style={[styles.textInput, { backgroundColor: colors.background, borderColor: colors.border, color: colors.foreground, fontFamily: "Inter_400Regular", borderRadius: 10 }]}
+                    autoCapitalize="characters"
                   />
+                  <Text style={[styles.fieldLabel, { color: colors.mutedForeground, fontFamily: "Inter_500Medium" }]}>
+                    Course Title
+                  </Text>
+                  <TextInput
+                    value={customTitle}
+                    onChangeText={(t) => { setCustomTitle(t); setFormError(""); }}
+                    placeholder="e.g. Programming Language I"
+                    placeholderTextColor={colors.mutedForeground}
+                    style={[styles.textInput, { backgroundColor: colors.background, borderColor: colors.border, color: colors.foreground, fontFamily: "Inter_400Regular", borderRadius: 10 }]}
+                  />
+                  <Text style={[styles.fieldLabel, { color: colors.mutedForeground, fontFamily: "Inter_500Medium" }]}>
+                    Credits
+                  </Text>
+                  <TextInput
+                    value={customCredits}
+                    onChangeText={setCustomCredits}
+                    placeholder="3"
+                    placeholderTextColor={colors.mutedForeground}
+                    keyboardType="numeric"
+                    style={[styles.textInput, { backgroundColor: colors.background, borderColor: colors.border, color: colors.foreground, fontFamily: "Inter_400Regular", borderRadius: 10 }]}
+                  />
+                  <Text style={[styles.fieldLabel, { color: colors.mutedForeground, fontFamily: "Inter_500Medium" }]}>
+                    Grade
+                  </Text>
+                  <GradeSelector value={grade} onChange={(g, p) => { setGrade(g); setGradePoints(p); setFormError(""); }} />
                 </View>
-                {filteredCourses.slice(0, 20).map((c) => (
-                  <Pressable
-                    key={c.id}
-                    onPress={() => setSelectedCourseId(c.id)}
-                    style={[
-                      styles.coursePickerRow,
-                      {
-                        backgroundColor:
-                          selectedCourseId === c.id ? colors.secondary : "transparent",
-                        borderRadius: 10,
-                        borderColor: selectedCourseId === c.id ? colors.primary : "transparent",
-                        borderWidth: 1,
-                      },
-                    ]}
-                  >
-                    <View>
-                      <Text style={[{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 14 }]}>
-                        {c.code}
-                      </Text>
-                      <Text style={[{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }]}>
-                        {c.title} · {c.credits} cr
-                      </Text>
-                    </View>
-                    {selectedCourseId === c.id && (
-                      <Feather name="check-circle" size={18} color={colors.primary} />
-                    )}
-                  </Pressable>
-                ))}
-                <Text style={[styles.fieldLabel, { color: colors.mutedForeground, fontFamily: "Inter_500Medium", marginTop: 12 }]}>
-                  Grade
+              ) : (
+                <View>
+                  <Text style={[styles.fieldLabel, { color: colors.mutedForeground, fontFamily: "Inter_500Medium" }]}>
+                    Search Course
+                  </Text>
+                  <View style={[styles.searchBox, { backgroundColor: colors.background, borderColor: colors.border, borderRadius: 10 }]}>
+                    <Feather name="search" size={16} color={colors.mutedForeground} />
+                    <TextInput
+                      value={courseSearch}
+                      onChangeText={setCourseSearch}
+                      placeholder="Course code or title..."
+                      placeholderTextColor={colors.mutedForeground}
+                      style={[styles.searchInput, { color: colors.foreground, fontFamily: "Inter_400Regular" }]}
+                    />
+                  </View>
+                  {filteredCourses.slice(0, 20).map((c) => (
+                    <Pressable
+                      key={c.id}
+                      onPress={() => { setSelectedCourseId(c.id); setFormError(""); }}
+                      style={[
+                        styles.coursePickerRow,
+                        {
+                          backgroundColor: selectedCourseId === c.id ? colors.secondary : "transparent",
+                          borderRadius: 10,
+                          borderColor: selectedCourseId === c.id ? colors.primary : "transparent",
+                          borderWidth: 1,
+                        },
+                      ]}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 14 }}>
+                          {c.code}
+                        </Text>
+                        <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12 }}>
+                          {c.title} · {c.credits} cr
+                        </Text>
+                      </View>
+                      {selectedCourseId === c.id && (
+                        <Feather name="check-circle" size={18} color={colors.primary} />
+                      )}
+                    </Pressable>
+                  ))}
+                  <Text style={[styles.fieldLabel, { color: colors.mutedForeground, fontFamily: "Inter_500Medium", marginTop: 12 }]}>
+                    Grade
+                  </Text>
+                  <GradeSelector value={grade} onChange={(g, p) => { setGrade(g); setGradePoints(p); setFormError(""); }} />
+                </View>
+              )}
+            </ScrollView>
+
+            {/* Inline error */}
+            {formError !== "" && (
+              <View style={[styles.errorBox, { backgroundColor: colors.destructive + "15", borderColor: colors.destructive, borderRadius: 8 }]}>
+                <Feather name="alert-circle" size={14} color={colors.destructive} />
+                <Text style={[styles.errorText, { color: colors.destructive, fontFamily: "Inter_500Medium" }]}>
+                  {formError}
                 </Text>
-                <GradeSelector value={grade} onChange={(g, p) => { setGrade(g); setGradePoints(p); }} />
-              </ScrollView>
+              </View>
             )}
 
             <View style={styles.modalActions}>
@@ -485,46 +482,24 @@ const styles = StyleSheet.create({
   greeting: { fontSize: 13, marginBottom: 2 },
   title: { fontSize: 26 },
   addBtn: { width: 46, height: 46, alignItems: "center", justifyContent: "center" },
-  cgpaCard: {
-    alignItems: "center",
-    padding: 28,
-    marginBottom: 16,
-    borderWidth: 1,
-    gap: 12,
-  },
+  cgpaCard: { alignItems: "center", padding: 28, marginBottom: 16, borderWidth: 1, gap: 12 },
   motivational: { fontSize: 13, textAlign: "center" },
   statsRow: { flexDirection: "row", gap: 10, marginBottom: 16 },
   section: { padding: 16, marginBottom: 16, borderWidth: 1 },
   sectionTitle: { fontSize: 16, marginBottom: 12 },
   reqBadge: { padding: 10 },
   reqText: { fontSize: 13, lineHeight: 18 },
-  coursesHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 10,
-  },
+  coursesHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
   courseCount: { fontSize: 13 },
-  courseRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 14,
-    marginBottom: 8,
-    borderWidth: 1,
-    gap: 12,
-  },
-  gradePill: {
-    width: 44,
-    height: 36,
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  courseRow: { flexDirection: "row", alignItems: "center", padding: 14, marginBottom: 8, borderWidth: 1, gap: 12 },
+  gradePill: { width: 44, height: 36, borderRadius: 8, alignItems: "center", justifyContent: "center" },
   gradeText: { fontSize: 14 },
   courseInfo: { flex: 1 },
   courseCode: { fontSize: 14 },
   courseTitle: { fontSize: 12, marginTop: 2 },
   creditText: { fontSize: 12 },
+  deleteRow: { flexDirection: "row", gap: 6 },
+  deleteActionBtn: { width: 32, height: 32, alignItems: "center", justifyContent: "center" },
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
   modalSheet: {
     borderTopLeftRadius: 24,
@@ -532,50 +507,20 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingTop: 12,
     borderTopWidth: 1,
-    maxHeight: "90%",
+    maxHeight: "92%",
   },
-  modalHandle: {
-    width: 40,
-    height: 4,
-    backgroundColor: "#ccc",
-    borderRadius: 2,
-    alignSelf: "center",
-    marginBottom: 16,
-  },
+  modalHandle: { width: 40, height: 4, backgroundColor: "#ccc", borderRadius: 2, alignSelf: "center", marginBottom: 16 },
   modalTitle: { fontSize: 20, marginBottom: 16 },
-  toggleRow: {
-    flexDirection: "row",
-    padding: 3,
-    marginBottom: 16,
-  },
+  toggleRow: { flexDirection: "row", padding: 3, marginBottom: 12 },
   toggleBtn: { flex: 1, paddingVertical: 8, alignItems: "center" },
   fieldLabel: { fontSize: 13, marginBottom: 6, marginTop: 8 },
-  textInput: {
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 15,
-    marginBottom: 4,
-  },
-  searchBox: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    gap: 8,
-    marginBottom: 10,
-  },
+  textInput: { borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15, marginBottom: 4 },
+  searchBox: { flexDirection: "row", alignItems: "center", borderWidth: 1, paddingHorizontal: 10, paddingVertical: 8, gap: 8, marginBottom: 10 },
   searchInput: { flex: 1, fontSize: 14 },
-  coursePickerRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    marginBottom: 4,
-  },
-  modalActions: { flexDirection: "row", gap: 10, marginTop: 16 },
+  coursePickerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 10, paddingHorizontal: 12, marginBottom: 4 },
+  errorBox: { flexDirection: "row", alignItems: "center", gap: 8, padding: 10, marginTop: 8, borderWidth: 1 },
+  errorText: { fontSize: 13, flex: 1 },
+  modalActions: { flexDirection: "row", gap: 10, marginTop: 12 },
   cancelBtn: { flex: 1, borderWidth: 1, paddingVertical: 13, alignItems: "center" },
   confirmBtn: { flex: 2, paddingVertical: 13, alignItems: "center" },
 });
